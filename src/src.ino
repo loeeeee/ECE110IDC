@@ -32,9 +32,10 @@ void setup()                                 // Built in initialization block
   // Serial initialization
   Serial.begin(9600);
   Serial1.begin(9600);
+  Serial2.begin(9600);
 
-  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
-  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
+  // Attach servo
+  attach_servo();
 
   // Attach built-in RGB LED
   pinMode(RGBred, OUTPUT);
@@ -152,6 +153,7 @@ void movement(){
         sensing();
         cycleLED();
         noRepeats = true;
+        Serial2.println(char(detectedPosition + 107));
       } else {
         move_forward(3);        
       }
@@ -263,4 +265,13 @@ void stop_move(int time){
   servoLeft.writeMicroseconds(speed(false, 0));
   servoRight.writeMicroseconds(speed(true, 0));
   delay(time);
+}
+
+void attach_servo(){
+  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
+  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
+}
+
+void detach_servo(){
+  servoLeft.detach();
 }
