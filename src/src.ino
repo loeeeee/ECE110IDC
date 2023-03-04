@@ -13,6 +13,9 @@ Servo servoRight;                            // Declare right servo signal
 #define RGBred 45
 #define RGBgreen 46
 #define RGBblue 44
+// LED pins
+#define yellowPin 8
+#define bluePin 9
 
 
 const int leftSpeedDis = 0;
@@ -34,23 +37,27 @@ void setup()                                 // Built in initialization block
   Serial1.begin(9600);
   Serial2.begin(9600);
 
-  // Attach servo
-  attach_servo();
+  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
+  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
 
   // Attach built-in RGB LED
   pinMode(RGBred, OUTPUT);
   pinMode(RGBgreen, OUTPUT);
   pinMode(RGBblue, OUTPUT);
 
+  // Pin mode for LEDs
+  pinMode(yellowPin, OUTPUT);
+  pinMode(bluePin, OUTPUT);
+
   // Initalizaiton flashes
   on_off_RGB(127, 0, 64, 50, false);
-  
-  ledCycle = 0; 
+
+  ledCycle = 0;
 }
 
 void loop() {
   movement();
-  delay(100);
+  //delay(100);
 }
 
 //Defines funtion 'rcTime' to read value from QTI sensor
@@ -76,11 +83,11 @@ void sensing() {
   char rfidData[len+1] = {};
   int get_more = 1;
   int i = 0;
-  
+
   while(get_more == 1){
     if(Serial1.available() > 0) {
     val = Serial1.read();
-  
+
       // Handle unprintable characters
       switch(val) {
         case 0x2: break;               // start of transmission - do not save
@@ -94,9 +101,9 @@ void sensing() {
   Serial.println(rfidData[9]);
   if (rfidData[9] == 'D') {
     detectedPosition = ledCycle;
-    on_off_RGB(255, 255, 0);
+    flashYellow();
   } else {
-    on_off_RGB(0, 0, 255);
+    flashBlue();
   }
 }
 
@@ -116,22 +123,22 @@ void movement(){
     case 1:
       // Right is black
       // Turn Right
-      turn_left(3);
+      turn_left(1);
       break;
     case 2:
       // Middle is black
       // Go
-      move_forward(3);
+      move_forward(1);
       break;
     case 3:
       // Right and Middle are black
       // Turn right
-      turn_right(3);
+      turn_right(1);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_right(3);
+      turn_right(1);
       break;
     case 5:
       // Left and Right is black
@@ -143,21 +150,20 @@ void movement(){
     case 6:
       // Left Middle are black
       // Turn left
-      turn_left(3);
+      turn_left(1);
       break;
     case 7:
       // All black
       // Stop for a second
       if(!noRepeats) {
         stop_move(1000);
-        sensing();
         cycleLED();
+        sensing();
         noRepeats = true;
-        Serial2.println(char(detectedPosition + 107));
       } else {
-        move_forward(3);        
+        move_forward(1);
       }
-      
+
       break;
     default:
       Serial.println("WTF!");
@@ -188,8 +194,8 @@ void cycleLED() {
       on_off_RGB(255, 0, 255);
       break;
     default:
-      Serial.print("Detected position: ");
-      Serial.println(detectedPosition);
+      on_off_RGB(255, 0, 0);
+      Serial2.print((char)(106 + detectedPosition));
       on_off_RGB(255, 255, 255, 0, true);
       stop_move(100000000);
       break;
@@ -208,7 +214,7 @@ void on_off_RGB(int R, int G, int B){
   analogWrite(RGBred, 255);
   analogWrite(RGBgreen, 255);
   analogWrite(RGBblue, 255);
-  
+
   return;
 }
 
@@ -217,7 +223,7 @@ void on_off_RGB(int R, int G, int B, int time, bool isPersistant){
   analogWrite(RGBgreen, 255 + -1 * G);
   analogWrite(RGBblue, 255 + -1 * B);
   delay(500);
-  
+
   if (!isPersistant) {
     analogWrite(RGBred, 255);
     analogWrite(RGBgreen, 255);
@@ -226,13 +232,25 @@ void on_off_RGB(int R, int G, int B, int time, bool isPersistant){
   return;
 }
 
+void flashBlue() {
+  digitalWrite(bluePin, HIGH);
+  delay(500);
+  digitalWrite(bluePin, LOW);
+}
+
+void flashYellow() {
+  digitalWrite(yellowPin, HIGH);
+  delay(500);
+  digitalWrite(yellowPin, LOW);
+}
+
 int speed(bool isRight, int percentage){
   // return the speed
   int default_num;
   if (isRight) {
     default_num = 1500 + 200 * percentage / 100 + rightSpeedDis;
   }else{
-    default_num = 1500 - 200 * percentage / 100 + leftSpeedDis;    
+    default_num = 1500 - 200 * percentage / 100 + leftSpeedDis;
   }
   return default_num;
 }
@@ -265,13 +283,4 @@ void stop_move(int time){
   servoLeft.writeMicroseconds(speed(false, 0));
   servoRight.writeMicroseconds(speed(true, 0));
   delay(time);
-}
-
-void attach_servo(){
-  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
-  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
-}
-
-void detach_servo(){
-  servoLeft.detach();
 }
