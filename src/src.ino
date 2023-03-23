@@ -46,8 +46,7 @@ void setup()                                 // Built in initialization block
   Serial2.begin(9600);
   LCDSerial.begin(9600);
 
-  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
-  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
+  servoAttach();
 
   // Attach built-in RGB LED
   pinMode(RGBred, OUTPUT);
@@ -194,6 +193,7 @@ void movement(){
 }
 
 void electric_boogaloo() {
+  servoAttach(); // allow movement again
   move_backwards();
 }
 
@@ -209,22 +209,22 @@ void move_backwards() {
     case 1:
       // right is black
       // Turn Right
-      turn_right(5);
+      turn_right(4);
       break;
     case 2:
       // Middle is black
       // Go
-      move_backwards(1);
+      move_backward(1);
       break;
     case 3:
       // Right and Middle are black
-      // Turn right
-      turn_left(5);
+      // Turn left
+      turn_left(4);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_left(5);
+      turn_left(4);
       break;
     case 5:
       // Left and Right is black
@@ -235,13 +235,13 @@ void move_backwards() {
       break;
     case 6:
       // Left Middle are black
-      // Turn left
-      turn_right(5);
+      // Turn right
+      turn_right(4);
       break;
     case 7:
       // All black
       // Stop for a second
-      stop_move();
+      stop_move(1);
       return;
 
     default:
@@ -249,6 +249,7 @@ void move_backwards() {
       delay(10);
       on_off_RGB(127, 0, 64, 500, false);
       break;
+  }
 }
 
 void cycleLED() {
@@ -284,6 +285,9 @@ void cycleLED() {
 }
 
 void shout_and_listen(){
+
+  servoDetach(); // Prevent movement by detaching servos
+
   int flag = 0; // this keep track of how much of the array is filled.
   bool isFinish = false;
   int countdown = 0;
@@ -297,23 +301,17 @@ void shout_and_listen(){
     if(Serial2.available() > 0){
       char c = Serial2.read();
       if (c == 'z') {
+        LCDSerial.write(13);
+        LCDSerial.print("Received z!");
         electric_boogaloo();
       }
       on_off_RGB(0,255,0);
+      LCDSerial.write(13);
+      LCDSerial.print(c);
     }
     countdown++;
     delay(10);
-    LCDSerial.write(13);
-    LCDSerial.print(106 + detectedPosition);
 
-  }
-  if (part_1_result[2] != detectedPosition){
-    ERROR = true;
-  }
-  if(ERROR){
-    
-    //do_it_again();
-    return;
   }
 }
 
@@ -408,6 +406,16 @@ void stop_move(int time){
   servoLeft.writeMicroseconds(speed(false, 0));
   servoRight.writeMicroseconds(speed(true, 0));
   delay(time);
+}
+
+void servoAttach() {
+  servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
+  servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
+}
+
+void servoDetach() {
+  servoLeft.detach();                      // Attach left signal to pin 13
+  servoRight.detach();                     // Attach right signal to pin 12
 }
 
 void play_song() {
