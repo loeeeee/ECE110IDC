@@ -193,6 +193,64 @@ void movement(){
   return;
 }
 
+void electric_boogaloo() {
+  move_backwards();
+}
+
+void move_backwards() {
+  int temp_qti_state = qti_state();
+
+  switch (temp_qti_state) {
+    case 0:
+      // All white
+      // Make a circle
+      neural_steer(2, true);
+      break;
+    case 1:
+      // right is black
+      // Turn Right
+      turn_right(5);
+      break;
+    case 2:
+      // Middle is black
+      // Go
+      move_backwards(1);
+      break;
+    case 3:
+      // Right and Middle are black
+      // Turn right
+      turn_left(5);
+      break;
+    case 4:
+      // Left is Black
+      // Turn left
+      turn_left(5);
+      break;
+    case 5:
+      // Left and Right is black
+      // Panic
+      on_off_RGB(64, 0, 127, 500, false);
+      delay(10);
+      on_off_RGB(127, 0, 64, 500, false);
+      break;
+    case 6:
+      // Left Middle are black
+      // Turn left
+      turn_right(5);
+      break;
+    case 7:
+      // All black
+      // Stop for a second
+      stop_move();
+      return;
+
+    default:
+      on_off_RGB(64, 0, 127, 500, false);
+      delay(10);
+      on_off_RGB(127, 0, 64, 500, false);
+      break;
+}
+
 void cycleLED() {
   int mod = ledCycle % 6;
   switch (mod) {
@@ -228,39 +286,26 @@ void cycleLED() {
 void shout_and_listen(){
   int flag = 0; // this keep track of how much of the array is filled.
   bool isFinish = false;
-  int countdown = 100;
+  int countdown = 0;
   if(detectedPosition > 4){
     ERROR = true;
   }
   while(!isFinish){
-    if (countdown%10 == 0){
+    if (countdown%5 == 0){
       broadcast(106 + detectedPosition);
     }
     if(Serial2.available() > 0){
       char c = Serial2.read();
-      if(c>='f' && c<='j'){
-        part_1_result[1] = (int) c-101;
-      }
-      if(c>='k' && c<='o'){
-        part_1_result[2] = (int) c-106;
-      }
-      if(c>='p' && c<='t'){
-        part_1_result[3] = (int) c-111;
-      }
-      if(c>='u' && c<='y'){
-        part_1_result[4] = (int) c-116;
+      if (c == 'z') {
+        electric_boogaloo();
       }
       on_off_RGB(0,255,0);
     }
-    countdown--;
+    countdown++;
     delay(10);
-    for(int i = 0;i<5;i++){
-      LCDSerial.write(13);
-      LCDSerial.print(part_1_result[i]);
-      if(part_1_result[i]==0){
-        isFinish=true;
-      }
-    }
+    LCDSerial.write(13);
+    LCDSerial.print(106 + detectedPosition);
+
   }
   if (part_1_result[2] != detectedPosition){
     ERROR = true;
@@ -270,102 +315,6 @@ void shout_and_listen(){
     //do_it_again();
     return;
   }
-}
-
-void do_it_again(){
-  neural_steer(120, true);
-  int hash_cnt = 0;
-  while(hash_cnt <= 4){
-    int temp_qti_state = qti_state();
-    switch (temp_qti_state) {
-      case 0:
-        // All white
-        // Make a circle
-        break;
-      case 1:
-        // Right is black
-        // Turn Right
-        turn_left(5);
-        break;
-      case 2:
-        // Middle is black
-        // Go
-        move_forward(1);
-        break;
-      case 3:
-        // Right and Middle are black
-        // Turn right
-        turn_right(5);
-        break;
-      case 4:
-        // Left is Black
-        // Turn left
-        turn_right(5);
-        break;
-      case 5:
-        // Left and Right is black
-        // Panic
-        on_off_RGB(64, 0, 127, 50, false);
-        delay(10);
-        on_off_RGB(127, 0, 64, 50, false);
-        break;
-      case 6:
-        // Left Middle are black
-        // Turn left
-        turn_left(5);
-        break;
-      case 7:
-        // All black
-        // Stop for a second
-        hash_cnt++;
-        move_forward(500);
-        break;
-      default:
-        Serial.println("WTF!");
-        on_off_RGB(127, 0, 64, 50, false);
-        delay(10);
-        on_off_RGB(64, 0, 127, 50, false);
-        break;
-    }
-  }
-  neural_steer(120, true);
-  ledCycle = 0;
-  movement();
-  return;
-}
-
-// Helper
-void shout_and_listen_backup(char code){
-  int position[5] = {0,0,0,0,0};
-  while(true){
-    if(Serial2.available()){
-      char c = Serial2.read();
-      Serial2.print(code);
-      if(c>='f' && c<='j'){
-        position[1] = (int) c-101;
-      }
-      if(c>='k' && c<='o'){
-        position[2] = (int) c-106;
-      }
-      if(c>='p' && c<='t'){
-        position[3] = (int) c-111;
-      }
-      if(c>='u' && c<='y'){
-        position[4] = (int) c-116;
-      }
-      bool communicationSuccessful = true;
-      for(int i = 0;i<5;i++){
-        //Serial.println(position[i]);
-        if(position[i]==0){
-          communicationSuccessful=false;
-        }
-      }
-      if(communicationSuccessful){
-        break;
-      }
-    }
-  }
-
 }
 
 void on_off_RGB(int R, int G, int B){
