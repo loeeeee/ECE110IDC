@@ -1,7 +1,12 @@
 #include <Servo.h>                           // Include servo library
+#include <SoftwareSerial.h>
 
 Servo servoLeft;                             // Declare left servo signal
 Servo servoRight;                            // Declare right servo signal
+
+#define LCDpin 14
+
+SoftwareSerial LCDSerial = SoftwareSerial(255, LCDpin);
 
 #define rightServoPin 11
 #define leftServoPin 12
@@ -29,6 +34,9 @@ int len = 14;
 char val = 0;
 
 int detectedPosition = 0;
+int part_1_result[5];
+
+bool ERROR = false;
 
 void setup()                                 // Built in initialization block
 {
@@ -36,6 +44,7 @@ void setup()                                 // Built in initialization block
   Serial.begin(9600);
   Serial1.begin(9600);
   Serial2.begin(9600);
+  LCDSerial.begin(9600);
 
   servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
   servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
@@ -53,6 +62,14 @@ void setup()                                 // Built in initialization block
   on_off_RGB(127, 0, 64, 50, false);
 
   ledCycle = 0;
+
+  LCDSerial.write(12); // clear
+  delay(10);
+  LCDSerial.write(22); // no cursor no blink
+  delay(10);
+  LCDSerial.write(17); // backlight
+  delay(10);
+  //play_song();
 }
 
 void loop() {
@@ -119,11 +136,12 @@ void movement(){
     case 0:
       // All white
       // Make a circle
+      neural_steer(2, true);
       break;
     case 1:
       // Right is black
       // Turn Right
-      turn_left(1);
+      turn_left(5);
       break;
     case 2:
       // Middle is black
@@ -133,24 +151,24 @@ void movement(){
     case 3:
       // Right and Middle are black
       // Turn right
-      turn_right(1);
+      turn_right(5);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_right(1);
+      turn_right(5);
       break;
     case 5:
       // Left and Right is black
       // Panic
-      on_off_RGB(64, 0, 127, 50, false);
+      on_off_RGB(64, 0, 127, 500, false);
       delay(10);
-      on_off_RGB(127, 0, 64, 50, false);
+      on_off_RGB(127, 0, 64, 500, false);
       break;
     case 6:
       // Left Middle are black
       // Turn left
-      turn_left(1);
+      turn_left(5);
       break;
     case 7:
       // All black
@@ -167,9 +185,9 @@ void movement(){
       break;
     default:
       Serial.println("WTF!");
-      on_off_RGB(127, 0, 64, 50, false);
+      on_off_RGB(127, 0, 64, 500, false);
       delay(10);
-      on_off_RGB(64, 0, 127, 50, false);
+      on_off_RGB(64, 0, 127, 500, false);
       break;
   }
   return;
@@ -192,16 +210,162 @@ void cycleLED() {
       break;
     case 4:
       on_off_RGB(255, 0, 255);
+      LCDSerial.write(12); // clear
+      LCDSerial.print(detectedPosition);   
       break;
     default:
       on_off_RGB(255, 0, 0);
-      Serial2.print((char)(106 + detectedPosition));
+      // Shout to all
+      shout_and_listen();
       on_off_RGB(255, 255, 255, 0, true);
       stop_move(100000000);
       break;
   }
   ledCycle++;
   return;
+}
+
+void shout_and_listen(){
+  int flag = 0; // this keep track of how much of the array is filled.
+  bool isFinish = false;
+  int countdown = 100;
+  if(detectedPosition > 4){
+    ERROR = true;
+  }
+  while(!isFinish){
+    if (countdown%10 == 0){
+      broadcast(106 + detectedPosition);
+    }
+    if(Serial2.available() > 0){
+      char c = Serial2.read();
+      if(c>='f' && c<='j'){
+        part_1_result[1] = (int) c-101;
+      }
+      if(c>='k' && c<='o'){
+        part_1_result[2] = (int) c-106;
+      }
+      if(c>='p' && c<='t'){
+        part_1_result[3] = (int) c-111;
+      }
+      if(c>='u' && c<='y'){
+        part_1_result[4] = (int) c-116;
+      }
+      on_off_RGB(0,255,0);
+    }
+    countdown--;
+    delay(10);
+    for(int i = 0;i<5;i++){
+      LCDSerial.write(13);
+      LCDSerial.print(part_1_result[i]);
+      if(part_1_result[i]==0){
+        isFinish=true;
+      }
+    }
+  }
+  if (part_1_result[2] != detectedPosition){
+    ERROR = true;
+  }
+  if(ERROR){
+    
+    //do_it_again();
+    return;
+  }
+}
+
+void do_it_again(){
+  neural_steer(120, true);
+  int hash_cnt = 0;
+  while(hash_cnt <= 4){
+    int temp_qti_state = qti_state();
+    switch (temp_qti_state) {
+      case 0:
+        // All white
+        // Make a circle
+        break;
+      case 1:
+        // Right is black
+        // Turn Right
+        turn_left(5);
+        break;
+      case 2:
+        // Middle is black
+        // Go
+        move_forward(1);
+        break;
+      case 3:
+        // Right and Middle are black
+        // Turn right
+        turn_right(5);
+        break;
+      case 4:
+        // Left is Black
+        // Turn left
+        turn_right(5);
+        break;
+      case 5:
+        // Left and Right is black
+        // Panic
+        on_off_RGB(64, 0, 127, 50, false);
+        delay(10);
+        on_off_RGB(127, 0, 64, 50, false);
+        break;
+      case 6:
+        // Left Middle are black
+        // Turn left
+        turn_left(5);
+        break;
+      case 7:
+        // All black
+        // Stop for a second
+        hash_cnt++;
+        move_forward(500);
+        break;
+      default:
+        Serial.println("WTF!");
+        on_off_RGB(127, 0, 64, 50, false);
+        delay(10);
+        on_off_RGB(64, 0, 127, 50, false);
+        break;
+    }
+  }
+  neural_steer(120, true);
+  ledCycle = 0;
+  movement();
+  return;
+}
+
+// Helper
+void shout_and_listen_backup(char code){
+  int position[5] = {0,0,0,0,0};
+  while(true){
+    if(Serial2.available()){
+      char c = Serial2.read();
+      Serial2.print(code);
+      if(c>='f' && c<='j'){
+        position[1] = (int) c-101;
+      }
+      if(c>='k' && c<='o'){
+        position[2] = (int) c-106;
+      }
+      if(c>='p' && c<='t'){
+        position[3] = (int) c-111;
+      }
+      if(c>='u' && c<='y'){
+        position[4] = (int) c-116;
+      }
+      bool communicationSuccessful = true;
+      for(int i = 0;i<5;i++){
+        //Serial.println(position[i]);
+        if(position[i]==0){
+          communicationSuccessful=false;
+        }
+      }
+      if(communicationSuccessful){
+        break;
+      }
+    }
+  }
+
 }
 
 void on_off_RGB(int R, int G, int B){
@@ -244,6 +408,12 @@ void flashYellow() {
   digitalWrite(yellowPin, LOW);
 }
 
+void broadcast(char input){
+  Serial2.print((char)(input));
+  on_off_RGB(255, 0, 0);
+  return;
+}
+
 int speed(bool isRight, int percentage){
   // return the speed
   int default_num;
@@ -269,18 +439,42 @@ void move_backward(int distance){
 
 void turn_left(int degree){
   servoLeft.writeMicroseconds(speed(false, 100));
-  servoRight.writeMicroseconds(speed(true, 0));
-  delay(degree * 30);
+  servoRight.writeMicroseconds(speed(true, 20));
+  delay(degree * 4);
 }
 
 void turn_right(int degree){
-  servoLeft.writeMicroseconds(speed(false, 0));
+  servoLeft.writeMicroseconds(speed(false, 20));
   servoRight.writeMicroseconds(speed(true, 100));
-  delay(degree * 30);
+  delay(degree * 4);
+}
+
+void neural_steer(int degree, bool isRight){
+  servoLeft.writeMicroseconds(speed(!isRight, -100));
+  servoRight.writeMicroseconds(speed(isRight, 100));
+  delay(degree * 5);
 }
 
 void stop_move(int time){
   servoLeft.writeMicroseconds(speed(false, 0));
   servoRight.writeMicroseconds(speed(true, 0));
   delay(time);
+}
+
+void play_song() {
+  int durs[9]  = {211, 212, 212, 211, 212, 
+                212, 212, 212, 212
+  };
+  int octs[9]  = {216, 216, 216, 216, 216, 
+                  216, 216, 215, 216
+  };
+  int notes[9] = {227, 227, 227, 223, 227,
+                230, 232, 230, 232
+  };
+ for(long k=0; k<9; k++){
+    LCDSerial.write(durs[k]); LCDSerial.write(octs[k]); LCDSerial.write(notes[k]);
+    int len = 214 - durs[k];
+    float del = 2000 / pow(2, len);
+    delay(int(del*1.1));
+  }
 }
