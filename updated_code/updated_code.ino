@@ -33,7 +33,6 @@ int len = 14;
 char val = 0;
 
 int detectedPosition = 0;
-int part_1_result[5];
 
 bool ERROR = false;
 
@@ -86,13 +85,17 @@ void loop() {
 // phase during which the bot moves to each hash and collects data
 void detecting_phase() {
 
-  for (int hash_count = 0; hash_count < 6; hash_count++) {
+  for (int hash_count = 0; hash_count < 5; hash_count++) {
     no_repeats = true;
     while (move_to_hash()); // move to next hash (false if on hash)
     stop_move(1000);        // pause for 1 second
     cycle_LED(hash_count);
     sensing(hash_count);    // read RFID at location (won't happen at last line)
   }
+
+  no_repeats = true;
+  while(move_to_hash());
+
 }
 
 void shout_and_listen(){
@@ -116,7 +119,7 @@ void shout_and_listen(){
       LCDSerial.print(c);
     }
     countdown++;
-    delay(2);
+    delay(10);
   }
 }
 
@@ -180,10 +183,7 @@ void sensing(int hash_count) {
   }
 }
 
-
-
-bool move_to_hash(){
-  // takes qti_state, move the robort
+bool move_to_hash() {
   int temp_qti_state = qti_state();
 
   if (temp_qti_state != 7) {
