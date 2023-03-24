@@ -22,12 +22,11 @@ SoftwareSerial LCDSerial = SoftwareSerial(255, LCDpin);
 #define yellowPin 8
 #define bluePin 9
 
-
+// for servo calibration
 const int leftSpeedDis = 0;
 const int rightSpeedDis = 0;
 
-int ledCycle;
-bool noRepeats = false;
+bool no_repeats = false;
 
 // length of RFID code
 int len = 14;
@@ -46,7 +45,7 @@ void setup()                                 // Built in initialization block
   Serial2.begin(9600);
   LCDSerial.begin(9600);
 
-  servoAttach();
+  attach_servos();
 
   // Attach built-in RGB LED
   pinMode(RGBred, OUTPUT);
@@ -58,9 +57,7 @@ void setup()                                 // Built in initialization block
   pinMode(bluePin, OUTPUT);
 
   // Initalizaiton flashes
-  on_off_RGB(127, 0, 64, 50, false);
-
-  ledCycle = 0;
+  flash_RGB(127, 0, 64, 50, false);
 
   LCDSerial.write(12); // clear
   delay(10);
@@ -72,8 +69,68 @@ void setup()                                 // Built in initialization block
 }
 
 void loop() {
-  movement();
-  //delay(100);
+  detecting_phase();
+
+  detach_servos();
+
+  shout_and_listen();
+   
+  flash_RGB(255, 255, 255);
+  attach_servos();
+
+  reverse_phase();
+
+  wait_to_go();
+}
+
+// phase during which the bot moves to each hash and collects data
+void detecting_phase() {
+
+  for (int hash_count = 0; hash_count < 6; hash_count++) {
+    no_repeats = true;
+    while (move_to_hash()); // move to next hash (false if on hash)
+    stop_move(1000);        // pause for 1 second
+    cycle_LED(hash_count);
+    sensing(hash_count);    // read RFID at location (won't happen at last line)
+  }
+}
+
+void shout_and_listen(){
+
+  int countdown = 0;
+
+  while(true){
+    if (countdown % 10 == 0){
+      broadcast(106 + detectedPosition);
+      flash_RGB(255,0,0);
+    }
+    if(Serial2.available() > 0){
+      char c = Serial2.read();
+      if (c == 'Z') {
+        LCDSerial.write(13);
+        LCDSerial.println("Detected Z!");
+        return;
+      }
+      flash_RGB(0,255,0);
+      LCDSerial.write(13);
+      LCDSerial.print(c);
+    }
+    countdown++;
+    delay(2);
+  }
+}
+
+void reverse_phase() {
+  no_repeats = true;
+  while(move_back_to_hash()); // move PROBLEM: turning moves forward
+  return;
+}
+
+void wait_to_go() {
+  while(true) {
+    flash_RGB(255, 0, 0);
+    stop_move(1);
+  }
 }
 
 //Defines funtion 'rcTime' to read value from QTI sensor
@@ -95,7 +152,7 @@ int qti_state(){
   return 4 * (qti_read(lineSensor1) > 250) + 2 * (qti_read(lineSensor2) > 250) + (qti_read(lineSensor3) > 250);
 }
 
-void sensing() {
+void sensing(int hash_count) {
   char rfidData[len+1] = {};
   int get_more = 1;
   int i = 0;
@@ -116,19 +173,21 @@ void sensing() {
   }
   Serial.println(rfidData[9]);
   if (rfidData[9] == 'D') {
-    detectedPosition = ledCycle;
+    detectedPosition = hash_count;
     flashYellow();
   } else {
     flashBlue();
   }
 }
 
-void movement(){
+
+
+bool move_to_hash(){
   // takes qti_state, move the robort
   int temp_qti_state = qti_state();
 
   if (temp_qti_state != 7) {
-    noRepeats = false;
+    no_repeats = false;
   }
 
   switch (temp_qti_state) {
@@ -140,7 +199,7 @@ void movement(){
     case 1:
       // Right is black
       // Turn Right
-      turn_left(2);
+      forward_left(10);
       break;
     case 2:
       // Middle is black
@@ -150,73 +209,44 @@ void movement(){
     case 3:
       // Right and Middle are black
       // Turn right
-      turn_right(5);
+      forward_right(10);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_right(2);
+      forward_right(10);
       break;
     case 5:
       // Left and Right is black
-      // Panic
-      on_off_RGB(64, 0, 127, 500, false);
-      delay(10);
-      on_off_RGB(127, 0, 64, 500, false);
+      // PANIC!!!
       break;
     case 6:
       // Left Middle are black
       // Turn left
-      turn_left(5);
+      forward_left(10);
       break;
     case 7:
       // All black
       // Stop for a second
-      if(!noRepeats) {
-        stop_move(1000);
-        cycleLED();
-        sensing();
-        noRepeats = true;
+      if(!no_repeats) {
+        return false;
       } else {
         move_forward(1);
       }
-
       break;
+
     default:
-      Serial.println("WTF!");
-      on_off_RGB(127, 0, 64, 500, false);
-      delay(10);
-      on_off_RGB(64, 0, 127, 500, false);
+      // PANIC!!!
       break;
   }
-  return;
+  return true;
 }
 
-void electric_boogaloo() {
-  servoAttach(); // allow movement again
-
-  LCDSerial.write(13);
-  LCDSerial.print("Part 2: Electric Boolagloo!");
-
-  bool at_hash = false;
-
-  noRepeats = true;
-  while(!at_hash) {
-    at_hash = move_backwards();
-  }
-
-  LCDSerial.write(13);
-  LCDSerial.print("Finished with the Boolagloo!");
-
-  while(true);
-  
-}
-
-bool move_backwards() {
+bool move_back_to_hash() {
   int temp_qti_state = qti_state();
 
   if (temp_qti_state != 7) {
-    noRepeats = false;
+    no_repeats = false;
   }
 
   switch (temp_qti_state) {
@@ -228,7 +258,7 @@ bool move_backwards() {
     case 1:
       // right is black
       // Turn Right
-      turn_right(4);
+      backward_right(10);
       break;
     case 2:
       // Middle is black
@@ -238,109 +268,66 @@ bool move_backwards() {
     case 3:
       // Right and Middle are black
       // Turn left
-      turn_left(4);
+      backward_left(10);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_left(4);
+      backward_left(10);
       break;
     case 5:
       // Left and Right is black
-      // Panic
-      on_off_RGB(64, 0, 127, 500, false);
-      delay(10);
-      on_off_RGB(127, 0, 64, 500, false);
+      // PANIC!!!
       break;
     case 6:
       // Left Middle are black
       // Turn right
-      turn_right(4);
+      backward_right(10);
       break;
     case 7:
       // All black
       // Stop for a second
-      if (!noRepeats) {
-        stop_move(1000);
-        servoDetach(); 
-        return true;
+      if (!no_repeats) {
+        return false;
       } else {
         move_backward(1);
       }
-      
+      break;
 
     default:
-      on_off_RGB(64, 0, 127, 500, false);
-      delay(10);
-      on_off_RGB(127, 0, 64, 500, false);
+      // PANIC!!!
       break;
   }
 
-  return false;
+  return true;
 }
 
-void cycleLED() {
-  int mod = ledCycle % 6;
-  switch (mod) {
+void cycle_LED(int hash_count) {
+  switch (hash_count) {
     case 0:
-      on_off_RGB(255, 0, 0);
+      flash_RGB(255, 0, 0);
       break;
     case 1:
-      on_off_RGB(255, 255, 0);
+      flash_RGB(255, 255, 0);
       break;
     case 2:
-      on_off_RGB(0, 255, 0);
+      flash_RGB(0, 255, 0);
       break;
     case 3:
-      on_off_RGB(0, 0, 255);
+      flash_RGB(0, 0, 255);
       break;
     case 4:
-      on_off_RGB(255, 0, 255);
+      flash_RGB(255, 0, 255);
       LCDSerial.write(12); // clear
       LCDSerial.print(detectedPosition);   
       break;
     default:
-      on_off_RGB(255, 0, 0);
-      // Shout to all
-      shout_and_listen();
-      on_off_RGB(255, 255, 255, 0, true);
-      stop_move(100000000);
+      flash_RGB(255, 255, 255);
       break;
   }
-  ledCycle++;
-  return;
 }
 
-void shout_and_listen(){
-
-  servoDetach(); // Prevent movement by detaching servos
-
-  int flag = 0; // this keep track of how much of the array is filled.
-  bool isFinish = false;
-  int countdown = 0;
-  if(detectedPosition > 10){
-    ERROR = true;
-  }
-  while(!isFinish){
-    if (countdown%5 == 0){
-      broadcast(106 + detectedPosition);
-    }
-    if(Serial2.available() > 0){
-      char c = Serial2.read();
-      if (c == 'z') {
-        electric_boogaloo();
-      }
-      on_off_RGB(0,255,0);
-      LCDSerial.write(13);
-      LCDSerial.print(c);
-    }
-    countdown++;
-    delay(5);
-
-  }
-}
-
-void on_off_RGB(int R, int G, int B){
+void flash_RGB(int R, int G, int B){
   analogWrite(RGBred, 255 + -1 * R);
   analogWrite(RGBgreen, 255 + -1 * G);
   analogWrite(RGBblue, 255 + -1 * B);
@@ -354,7 +341,21 @@ void on_off_RGB(int R, int G, int B){
   return;
 }
 
-void on_off_RGB(int R, int G, int B, int time, bool isPersistant){
+void fast_RGB(int R, int G, int B) {
+  analogWrite(RGBred, 255 + -1 * R);
+  analogWrite(RGBgreen, 255 + -1 * G);
+  analogWrite(RGBblue, 255 + -1 * B);
+
+  delay(200);
+
+  analogWrite(RGBred, 255);
+  analogWrite(RGBgreen, 255);
+  analogWrite(RGBblue, 255);
+
+}
+
+
+void flash_RGB(int R, int G, int B, int time, bool isPersistant){
   analogWrite(RGBred, 255 + -1 * R);
   analogWrite(RGBgreen, 255 + -1 * G);
   analogWrite(RGBblue, 255 + -1 * B);
@@ -382,7 +383,7 @@ void flashYellow() {
 
 void broadcast(char input){
   Serial2.print((char)(input));
-  on_off_RGB(255, 0, 0);
+  flash_RGB(255, 0, 0);
   return;
 }
 
@@ -409,15 +410,27 @@ void move_backward(int distance){
   delay(distance);
 }
 
-void turn_left(int degree){
+void forward_left(int degree){
   servoLeft.writeMicroseconds(speed(false, 100));
   servoRight.writeMicroseconds(speed(true, 20));
   delay(degree);
 }
 
-void turn_right(int degree){
+void forward_right(int degree){
   servoLeft.writeMicroseconds(speed(false, 20));
   servoRight.writeMicroseconds(speed(true, 100));
+  delay(degree);
+}
+
+void backward_left(int degree){
+  servoLeft.writeMicroseconds(speed(false, -100));
+  servoRight.writeMicroseconds(speed(true, -20));
+  delay(degree);
+}
+
+void backward_right(int degree){
+  servoLeft.writeMicroseconds(speed(false, -20));
+  servoRight.writeMicroseconds(speed(true, -100));
   delay(degree);
 }
 
@@ -433,12 +446,12 @@ void stop_move(int time){
   delay(time);
 }
 
-void servoAttach() {
+void attach_servos() {
   servoLeft.attach(leftServoPin);                      // Attach left signal to pin 13
   servoRight.attach(rightServoPin);                     // Attach right signal to pin 12
 }
 
-void servoDetach() {
+void detach_servos() {
   servoLeft.detach();                      // Attach left signal to pin 13
   servoRight.detach();                     // Attach right signal to pin 12
 }
