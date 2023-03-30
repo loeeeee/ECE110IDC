@@ -33,6 +33,7 @@ int len = 14;
 char val = 0;
 
 int detectedPosition = 0;
+int part_1_result[5];
 
 bool ERROR = false;
 
@@ -76,10 +77,16 @@ void loop() {
    
   flash_RGB(255, 255, 255);
   attach_servos();
-
   reverse_phase();
 
   wait_to_go();
+
+  end_question_mark();
+  /*
+  */
+
+  how_do_we_get_here();
+  detach_servos();  
 }
 
 // phase during which the bot moves to each hash and collects data
@@ -92,10 +99,8 @@ void detecting_phase() {
     cycle_LED(hash_count);
     sensing(hash_count);    // read RFID at location (won't happen at last line)
   }
-
   no_repeats = true;
-  while(move_to_hash());
-
+  while (move_to_hash()); // move to next hash (false if on hash)
 }
 
 void shout_and_listen(){
@@ -109,7 +114,7 @@ void shout_and_listen(){
     }
     if(Serial2.available() > 0){
       char c = Serial2.read();
-      if (c == 'Z') {
+      if (c == 'z') {
         LCDSerial.write(13);
         LCDSerial.println("Detected Z!");
         return;
@@ -119,13 +124,13 @@ void shout_and_listen(){
       LCDSerial.print(c);
     }
     countdown++;
-    delay(10);
+    delay(2);
   }
 }
 
 void reverse_phase() {
   no_repeats = true;
-  while(move_back_to_hash()); // move PROBLEM: turning moves forward
+  move_backward(550); // oves forward
   return;
 }
 
@@ -133,6 +138,39 @@ void wait_to_go() {
   while(true) {
     flash_RGB(255, 0, 0);
     stop_move(1);
+
+    if(Serial2.available() > 0){
+      char c = Serial2.read();
+      if (c == (char)detectedPosition) {
+        LCDSerial.write(13);
+        LCDSerial.println("Moving to final position!");
+        return;
+      }
+    }
+  }
+}
+
+void end_question_mark() {
+  no_repeats = true;
+
+  for (int hash_count = 0; hash_count < 3; hash_count++) { // move forwards three hashes
+    no_repeats = true;
+    while (move_to_hash()); // move to next hash (false if on hash)
+    stop_move(50);
+    flashYellow();
+  }
+  move_forward(140);
+  tank_turn(600, true);
+}
+
+void how_do_we_get_here(){
+  no_repeats = true;
+
+  for (int hash_count = 0; hash_count < 3; hash_count++) { // move forwards three hashes
+    no_repeats = true;
+    while (move_curve_to_hash()); // move to next hash (false if on hash)
+    stop_move(50);
+    flashYellow();
   }
 }
 
@@ -183,7 +221,10 @@ void sensing(int hash_count) {
   }
 }
 
-bool move_to_hash() {
+
+
+bool move_to_hash(){
+  // takes qti_state, move the robort
   int temp_qti_state = qti_state();
 
   if (temp_qti_state != 7) {
@@ -194,12 +235,12 @@ bool move_to_hash() {
     case 0:
       // All white
       // Make a circle
-      neural_steer(2, true);
+      move_forward(15);
       break;
     case 1:
       // Right is black
       // Turn Right
-      forward_left(10);
+      forward_left(5);
       break;
     case 2:
       // Middle is black
@@ -209,12 +250,12 @@ bool move_to_hash() {
     case 3:
       // Right and Middle are black
       // Turn right
-      forward_right(10);
+      forward_right(5);
       break;
     case 4:
       // Left is Black
       // Turn left
-      forward_right(10);
+      forward_right(5);
       break;
     case 5:
       // Left and Right is black
@@ -223,7 +264,71 @@ bool move_to_hash() {
     case 6:
       // Left Middle are black
       // Turn left
-      forward_left(10);
+      forward_left(5);
+      break;
+    case 7:
+      // All black
+      // Stop for a second
+      if(!no_repeats) {
+        return false;
+      } else {
+        move_forward(1);
+      }
+      break;
+
+    default:
+      // PANIC!!!
+      break;
+  }
+  return true;
+}
+
+bool move_curve_to_hash(){
+  // takes qti_state, move the robort
+  int temp_qti_state = qti_state();
+
+  if (temp_qti_state != 7) {
+    no_repeats = false;
+  }
+
+  switch (temp_qti_state) {
+    case 0:
+      // All white
+      // Make a circle
+      move_forward(15);
+      break;
+    case 1:
+      // Right is black
+      // Turn Right
+      turn_left(20);
+      LCDSerial.write(13);
+      LCDSerial.print("Right is black.");
+      break;
+    case 2:
+      // Middle is black
+      // Go
+      move_forward(1);
+      break;
+    case 3:
+      // Right and Middle are black
+      // Turn right
+      turn_right(20);
+      break;
+    case 4:
+      // Left is Black
+      // Turn left
+      turn_right(20);
+      LCDSerial.write(13);
+      LCDSerial.print("Right is black.");
+      break;
+    case 5:
+      // Left and Right is black
+      // PANIC!!!
+      break;
+    case 6:
+      // Left Middle are black
+      // Turn left
+      turn_left(60);
       break;
     case 7:
       // All black
@@ -253,7 +358,7 @@ bool move_back_to_hash() {
     case 0:
       // All white
       // Make a circle
-      neural_steer(2, true);
+      tank_turn(2, true);
       break;
     case 1:
       // right is black
@@ -410,6 +515,18 @@ void move_backward(int distance){
   delay(distance);
 }
 
+void turn_left(int degree){
+  servoLeft.writeMicroseconds(speed(false, 100));
+  servoRight.writeMicroseconds(speed(true, 0));
+  delay(degree);
+}
+
+void turn_right(int degree){
+  servoLeft.writeMicroseconds(speed(false, 0));
+  servoRight.writeMicroseconds(speed(true, 100));
+  delay(degree);
+}
+
 void forward_left(int degree){
   servoLeft.writeMicroseconds(speed(false, 100));
   servoRight.writeMicroseconds(speed(true, 20));
@@ -434,7 +551,7 @@ void backward_right(int degree){
   delay(degree);
 }
 
-void neural_steer(int degree, bool isRight){
+void tank_turn(int degree, bool isRight){
   servoLeft.writeMicroseconds(speed(!isRight, -100));
   servoRight.writeMicroseconds(speed(isRight, 100));
   delay(degree);
