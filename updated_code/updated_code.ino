@@ -72,21 +72,23 @@ void loop() {
   detecting_phase();
 
   detach_servos();
-
+  
   shout_and_listen();
    
   flash_RGB(255, 255, 255);
   attach_servos();
+  delay(200);
   reverse_phase();
 
   wait_to_go();
 
   end_question_mark();
-  /*
-  */
-
+  
   how_do_we_get_here();
   detach_servos();  
+  /*
+  play_song_2();
+  */
 }
 
 // phase during which the bot moves to each hash and collects data
@@ -101,52 +103,68 @@ void detecting_phase() {
   }
   no_repeats = true;
   while (move_to_hash()); // move to next hash (false if on hash)
+
+  stop_move(1);
 }
 
 void shout_and_listen(){
 
   int countdown = 0;
 
+  broadcast(107 + detectedPosition);
+  instant_RGB(255,0,0);
+
   while(true){
-    if (countdown % 10 == 0){
-      broadcast(106 + detectedPosition);
-      flash_RGB(255,0,0);
+    /*
+    if (countdown % 5 == 0){
+
     }
+    */
     if(Serial2.available() > 0){
       char c = Serial2.read();
+      Serial.print("received: ");
+      Serial.println(c);
       if (c == 'z') {
         LCDSerial.write(13);
         LCDSerial.println("Detected Z!");
         return;
       }
-      flash_RGB(0,255,0);
-      LCDSerial.write(13);
-      LCDSerial.print(c);
+      instant_RGB(0,255,0);
     }
     countdown++;
-    delay(2);
+    delay(100);
   }
 }
 
 void reverse_phase() {
   no_repeats = true;
-  move_backward(550); // oves forward
+  move_backward(1300); // oves forward
   return;
 }
 
 void wait_to_go() {
+  detectedPosition = 3;
+  Serial.println("Wait to go!");
   while(true) {
-    flash_RGB(255, 0, 0);
+    instant_RGB(255, 0, 0);
     stop_move(1);
 
     if(Serial2.available() > 0){
+      instant_RGB(0, 255, 0);
       char c = Serial2.read();
-      if (c == (char)detectedPosition) {
+      Serial.println(30+detectedPosition);
+      Serial.print("receiving: ");
+      Serial.print(c);
+      Serial.print(" as ");
+      Serial.println((int)c);
+      Serial.println();
+      if (c == 48+detectedPosition) {
         LCDSerial.write(13);
         LCDSerial.println("Moving to final position!");
         return;
       }
     }
+    delay(200);
   }
 }
 
@@ -166,7 +184,10 @@ void end_question_mark() {
 void how_do_we_get_here(){
   no_repeats = true;
 
-  for (int hash_count = 0; hash_count < 3; hash_count++) { // move forwards three hashes
+  for (int hash_count = 0; hash_count < 4-detectedPosition; hash_count++) { // move forwards three hashes
+    if (hash_count == 1){
+      broadcast("0" + detectedPosition + 1);
+    }
     no_repeats = true;
     while (move_curve_to_hash()); // move to next hash (false if on hash)
     stop_move(50);
@@ -220,8 +241,6 @@ void sensing(int hash_count) {
     flashBlue();
   }
 }
-
-
 
 bool move_to_hash(){
   // takes qti_state, move the robort
@@ -300,24 +319,22 @@ bool move_curve_to_hash(){
     case 1:
       // Right is black
       // Turn Right
-      turn_left(20);
-      LCDSerial.write(13);
-      LCDSerial.print("Right is black.");
+      turn_left(60);
       break;
     case 2:
       // Middle is black
       // Go
-      move_forward(1);
+      move_forward(20);
       break;
     case 3:
       // Right and Middle are black
       // Turn right
-      turn_right(20);
+      turn_right(60);
       break;
     case 4:
       // Left is Black
       // Turn left
-      turn_right(20);
+      turn_right(60);
       LCDSerial.write(13);
       LCDSerial.print("Right is black.");
       break;
@@ -336,7 +353,7 @@ bool move_curve_to_hash(){
       if(!no_repeats) {
         return false;
       } else {
-        move_forward(1);
+        move_forward(20);
       }
       break;
 
@@ -456,7 +473,12 @@ void fast_RGB(int R, int G, int B) {
   analogWrite(RGBred, 255);
   analogWrite(RGBgreen, 255);
   analogWrite(RGBblue, 255);
+}
 
+void instant_RGB(int R, int G, int B) {
+  analogWrite(RGBred, 255 + -1 * R);
+  analogWrite(RGBgreen, 255 + -1 * G);
+  analogWrite(RGBblue, 255 + -1 * B);
 }
 
 
@@ -517,24 +539,24 @@ void move_backward(int distance){
 
 void turn_left(int degree){
   servoLeft.writeMicroseconds(speed(false, 100));
-  servoRight.writeMicroseconds(speed(true, 0));
+  servoRight.writeMicroseconds(speed(true, -20));
   delay(degree);
 }
 
 void turn_right(int degree){
-  servoLeft.writeMicroseconds(speed(false, 0));
+  servoLeft.writeMicroseconds(speed(false, -20));
   servoRight.writeMicroseconds(speed(true, 100));
   delay(degree);
 }
 
 void forward_left(int degree){
   servoLeft.writeMicroseconds(speed(false, 100));
-  servoRight.writeMicroseconds(speed(true, 20));
+  servoRight.writeMicroseconds(speed(true, 25));
   delay(degree);
 }
 
 void forward_right(int degree){
-  servoLeft.writeMicroseconds(speed(false, 20));
+  servoLeft.writeMicroseconds(speed(false, 25));
   servoRight.writeMicroseconds(speed(true, 100));
   delay(degree);
 }
@@ -588,5 +610,18 @@ void play_song() {
     int len = 214 - durs[k];
     float del = 2000 / pow(2, len);
     delay(int(del*1.1));
+  }
+}
+
+void play_song_2() {
+  // Define melody notes and durations
+  int notes[] = {262, 294, 330, 349, 392, 440, 494, 523}; // C4, D4, E4, F4, G4, A4, B4, C5
+  int durations[] = {4, 4, 4, 2, 4, 4, 4, 2};
+  for (int i = 0; i < 8; i++) {
+    LCDSerial.write(byte(0)); // Turn on the built-in speaker
+    tone(8, notes[i]);
+    delay(durations[i] * 250);
+    noTone(8);
+    LCDSerial.write(byte(255)); // Turn off the built-in speaker
   }
 }
