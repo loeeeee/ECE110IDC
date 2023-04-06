@@ -69,6 +69,8 @@ void setup()                                 // Built in initialization block
 }
 
 void loop() {
+  /*
+  */
   detecting_phase();
 
   detach_servos();
@@ -79,11 +81,9 @@ void loop() {
   attach_servos();
   delay(200);
   reverse_phase();
-
   wait_to_go();
 
   end_question_mark();
-  
   how_do_we_get_here();
   detach_servos();  
   /*
@@ -99,7 +99,7 @@ void detecting_phase() {
     while (move_to_hash()); // move to next hash (false if on hash)
     stop_move(1000);        // pause for 1 second
     cycle_LED(hash_count);
-    sensing(hash_count);    // read RFID at location (won't happen at last line)
+    sensing(hash_count + 1);    // read RFID at location (won't happen at last line)
   }
   no_repeats = true;
   while (move_to_hash()); // move to next hash (false if on hash)
@@ -143,7 +143,6 @@ void reverse_phase() {
 }
 
 void wait_to_go() {
-  detectedPosition = 3;
   Serial.println("Wait to go!");
   while(true) {
     instant_RGB(255, 0, 0);
@@ -152,12 +151,7 @@ void wait_to_go() {
     if(Serial2.available() > 0){
       instant_RGB(0, 255, 0);
       char c = Serial2.read();
-      Serial.println(30+detectedPosition);
-      Serial.print("receiving: ");
-      Serial.print(c);
-      Serial.print(" as ");
-      Serial.println((int)c);
-      Serial.println();
+
       if (c == 48+detectedPosition) {
         LCDSerial.write(13);
         LCDSerial.println("Moving to final position!");
@@ -184,9 +178,9 @@ void end_question_mark() {
 void how_do_we_get_here(){
   no_repeats = true;
 
-  for (int hash_count = 0; hash_count < 4-detectedPosition; hash_count++) { // move forwards three hashes
+  for (int hash_count = 0; hash_count < 6-detectedPosition; hash_count++) { // move forwards three hashes
     if (hash_count == 1){
-      broadcast("0" + detectedPosition + 1);
+      broadcast((char)((int)'0' + detectedPosition + 1));
     }
     no_repeats = true;
     while (move_curve_to_hash()); // move to next hash (false if on hash)
