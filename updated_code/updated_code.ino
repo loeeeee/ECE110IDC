@@ -74,6 +74,9 @@ void loop() {
   detecting_phase();
 
   detach_servos();
+
+  LCDSerial.write(12); // clear
+  LCDSerial.print(detectedPosition);   
   
   shout_and_listen();
    
@@ -86,9 +89,9 @@ void loop() {
   end_question_mark();
   how_do_we_get_here();
   detach_servos();  
-  /*
-  play_song_2();
-  */
+
+  while(true) { play_song(); }
+
 }
 
 // phase during which the bot moves to each hash and collects data
@@ -125,8 +128,6 @@ void shout_and_listen(){
       Serial.print("received: ");
       Serial.println(c);
       if (c == 'z') {
-        LCDSerial.write(13);
-        LCDSerial.println("Detected Z!");
         return;
       }
       instant_RGB(0,255,0);
@@ -153,8 +154,6 @@ void wait_to_go() {
       char c = Serial2.read();
 
       if (c == 48+detectedPosition) {
-        LCDSerial.write(13);
-        LCDSerial.println("Moving to final position!");
         return;
       }
     }
@@ -329,8 +328,6 @@ bool move_curve_to_hash(){
       // Left is Black
       // Turn left
       turn_right(60);
-      LCDSerial.write(13);
-      LCDSerial.print("Right is black.");
       break;
     case 5:
       // Left and Right is black
@@ -434,8 +431,6 @@ void cycle_LED(int hash_count) {
       break;
     case 4:
       flash_RGB(255, 0, 255);
-      LCDSerial.write(12); // clear
-      LCDSerial.print(detectedPosition);   
       break;
     default:
       flash_RGB(255, 255, 255);
@@ -589,33 +584,34 @@ void detach_servos() {
   servoRight.detach();                     // Attach right signal to pin 12
 }
 
+#define num 24
+
+int durs[num]  = {214, 214, 
+                  212, 212, 212, 211, 210, 210, 
+                  212, 211, 210, 210, 213,
+                  212, 212, 212, 211, 210, 210, 
+                  212, 211, 210, 210, 213
+};
+int octs[num]  = {218, 218, 
+                  218, 218, 218, 218, 218, 219,
+                  218, 218, 218, 219, 218,
+                  218, 218, 218, 218, 218, 217,
+                  217, 217, 217, 218, 217,
+};
+int notes[num] = {232, 232, 
+                  230, 230, 230, 226, 226, 231,
+                  230, 226, 226, 231, 230,
+                  225, 225, 225, 226, 226, 231,
+                  229, 226, 226, 221, 230
+};
+
 void play_song() {
-  int durs[9]  = {211, 212, 212, 211, 212, 
-                212, 212, 212, 212
-  };
-  int octs[9]  = {216, 216, 216, 216, 216, 
-                  216, 216, 215, 216
-  };
-  int notes[9] = {227, 227, 227, 223, 227,
-                230, 232, 230, 232
-  };
- for(long k=0; k<9; k++){
+  // Define melody notes and d
+   for(long k=0; k<num; k++){
+    
     LCDSerial.write(durs[k]); LCDSerial.write(octs[k]); LCDSerial.write(notes[k]);
     int len = 214 - durs[k];
     float del = 2000 / pow(2, len);
     delay(int(del*1.1));
-  }
-}
-
-void play_song_2() {
-  // Define melody notes and durations
-  int notes[] = {262, 294, 330, 349, 392, 440, 494, 523}; // C4, D4, E4, F4, G4, A4, B4, C5
-  int durations[] = {4, 4, 4, 2, 4, 4, 4, 2};
-  for (int i = 0; i < 8; i++) {
-    LCDSerial.write(byte(0)); // Turn on the built-in speaker
-    tone(8, notes[i]);
-    delay(durations[i] * 250);
-    noTone(8);
-    LCDSerial.write(byte(255)); // Turn off the built-in speaker
   }
 }
